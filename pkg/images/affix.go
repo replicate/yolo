@@ -2,6 +2,7 @@ package images
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +16,9 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/stream"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
+
+//go:embed ast_openapi_schema.py
+var script string
 
 func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse string, auth authn.Authenticator) (string, error) {
 
@@ -111,7 +115,8 @@ func updatePredictor(img v1.Image, predictorToParse string) (v1.Image, error) {
 }
 
 func getSchema(predictorToParse string) (string, error) {
-	cmd := exec.Command("python3", "python/ast_openapi_schema.py", predictorToParse)
+	cmd := exec.Command("python3", "-c", script, predictorToParse)
+
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
