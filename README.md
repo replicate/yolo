@@ -36,7 +36,9 @@ Visit https://replicate.com/auth/token and copy your token.
 
 ## modify an model (SDXL)
 
-   git clone https://github.com/replicate-ai/cog-sdxl.git
+Grab the code by cloning the repo
+
+   git clone https://github.com/replicate/cog-sdxl.git
 
 ## find an existing version to modify
 
