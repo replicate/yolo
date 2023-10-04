@@ -1,9 +1,9 @@
-from cog import BasePredictor
+from cog import BasePredictor, Input
 
 
 class Predictor(BasePredictor):
     def setup(self):
         self.prefix = "hello"
 
-    def predict(self) -> str:
-        return self.prefix + " world"
+    def predict(self, text: str = Input(description="Text to prefix with 'hello '")) -> str:
+        return self.prefix + " " + text

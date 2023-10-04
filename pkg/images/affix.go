@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -15,7 +16,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
-func Affix(baseRef string, dest string, newLayer *bytes.Buffer, auth authn.Authenticator) (string, error) {
+func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse string, auth authn.Authenticator) (string, error) {
 
 	var base v1.Image
 	var err error
@@ -28,6 +29,14 @@ func Affix(baseRef string, dest string, newLayer *bytes.Buffer, auth authn.Authe
 		return "", fmt.Errorf("pulling %w", err)
 	}
 	fmt.Fprintln(os.Stderr, "pulling took", time.Since(start))
+
+	// try to parse the predictor if it's provided
+	if predictorToParse != "" {
+		base, err = updatePredictor(base, predictorToParse)
+		if err != nil {
+			return "", fmt.Errorf("updating predictor: %w", err)
+		}
+	}
 
 	// FIXME(ja): find any YOLOs in the history and remove them?  We don't want to grow the history forever
 
@@ -59,7 +68,6 @@ func Affix(baseRef string, dest string, newLayer *bytes.Buffer, auth authn.Authe
 }
 
 // All of this code is from pkg/v1/mutate - so we can add history and use a tarball
-
 func appendLayer(base v1.Image, tarball *bytes.Buffer) (v1.Image, error) {
 	baseMediaType, err := base.MediaType()
 	if err != nil {
@@ -81,4 +89,36 @@ func appendLayer(base v1.Image, tarball *bytes.Buffer) (v1.Image, error) {
 	}
 
 	return mutate.Append(base, mutate.Addendum{Layer: layer, History: history})
+}
+
+func updatePredictor(img v1.Image, predictorToParse string) (v1.Image, error) {
+	schema, err := getSchema(predictorToParse)
+	if err != nil {
+		return nil, fmt.Errorf("getting schema: %w", err)
+	}
+
+	cfg, err := img.ConfigFile()
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("updating predictor to schema with length", len(schema))
+
+	cfg.Config.Labels["org.cogmodel.openapi_schema"] = schema
+	cfg.Config.Labels["run.cog.openapi_schema"] = schema
+
+	return mutate.Config(img, cfg.Config)
+}
+
+func getSchema(predictorToParse string) (string, error) {
+	cmd := exec.Command("python3", "python/ast_openapi_schema.py", predictorToParse)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("running ast_openapi_schema.py: %w", err)
+	}
+
+	schema := string(bytes.TrimSpace(out.Bytes()))
+	return schema, nil
 }
