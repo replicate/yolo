@@ -85,7 +85,7 @@ func makeTar(args []string) (*bytes.Buffer, error) {
 
 		// FIXME(ja): we shouldn't always just put things in /src stripping the path
 		baseName := filepath.Base(file)
-		dest := filepath.Join("/src", baseName)
+		dest := filepath.Join("src", baseName)
 		fmt.Println("adding:", dest)
 
 		hdr := &tar.Header{
