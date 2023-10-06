@@ -5,5 +5,5 @@ class Predictor(BasePredictor):
     def setup(self):
         self.prefix = "hello"
 
-    def predict(self, text: str = Input(description="Text to prefix with 'hello '")) -> str:
-        return self.prefix + " " + text
+    def predict(self, name: str = Input(description="What is your name?")) -> str:
+        return self.prefix + " " + name
