@@ -20,6 +20,7 @@ var (
 	baseRef   string
 	dest      string
 	ast       string
+	commit    string
 )
 
 func newPushCommand() *cobra.Command {
@@ -38,6 +39,7 @@ func newPushCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&dest, "dest", "d", "", "destination image reference: r8.im/username/modelname")
 	cmd.MarkFlagRequired("dest")
 	cmd.Flags().StringVarP(&ast, "ast", "a", "", "optional file to parse AST to update openapi schema")
+	cmd.Flags().StringVarP(&commit, "commit", "c", "", "optional commit hash to update openapi schema")
 
 	return cmd
 }
@@ -59,7 +61,7 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	image_id, err := images.Affix(baseRef, dest, tar, ast, auth)
+	image_id, err := images.Affix(baseRef, dest, tar, ast, commit, auth)
 	if err != nil {
 		return err
 	}

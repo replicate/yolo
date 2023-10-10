@@ -20,7 +20,7 @@ import (
 //go:embed ast_openapi_schema.py
 var script string
 
-func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse string, auth authn.Authenticator) (string, error) {
+func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse string, commit string, auth authn.Authenticator) (string, error) {
 
 	var base v1.Image
 	var err error
@@ -37,6 +37,13 @@ func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse
 	// try to parse the predictor if it's provided
 	if predictorToParse != "" {
 		base, err = updatePredictor(base, predictorToParse)
+		if err != nil {
+			return "", fmt.Errorf("updating predictor: %w", err)
+		}
+	}
+
+	if commit != "" {
+		base, err = updateCommit(base, commit)
 		if err != nil {
 			return "", fmt.Errorf("updating predictor: %w", err)
 		}
@@ -93,6 +100,17 @@ func appendLayer(base v1.Image, tarball *bytes.Buffer) (v1.Image, error) {
 	}
 
 	return mutate.Append(base, mutate.Addendum{Layer: layer, History: history})
+}
+
+func updateCommit(img v1.Image, commit string) (v1.Image, error) {
+	cfg, err := img.ConfigFile()
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.Config.Labels["org.opencontainers.image.revision"] = commit
+
+	return mutate.Config(img, cfg.Config)
 }
 
 func updatePredictor(img v1.Image, predictorToParse string) (v1.Image, error) {
