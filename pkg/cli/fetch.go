@@ -19,7 +19,7 @@ func newFetchCommand() *cobra.Command {
 		Args:   cobra.ExactArgs(1),
 	}
 
-	cmd.Flags().StringVarP(&sToken, "token", "t", "", "replicate cog token")
+	cmd.Flags().StringVarP(&sToken, "token", "t", "", "replicate api token")
 	cmd.Flags().StringVarP(&sRegistry, "registry", "r", "r8.im", "registry host")
 	cmd.Flags().StringVarP(&baseRef, "base", "b", "", "base image reference - include tag: r8.im/username/modelname@sha256:hexdigest")
 	cmd.MarkFlagRequired("base")
@@ -30,9 +30,14 @@ func newFetchCommand() *cobra.Command {
 func fetchCommmand(cmd *cobra.Command, args []string) error {
 	dest := args[0]
 	if sToken == "" {
+		sToken = os.Getenv("REPLICATE_API_TOKEN")
+	}
+
+	if sToken == "" {
 		sToken = os.Getenv("COG_TOKEN")
 	}
 
+	// FIXME(ja): support fetching public images without auth?
 	u, err := auth.VerifyCogToken(sRegistry, sToken)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "authentication error, invalid token or registry host error")

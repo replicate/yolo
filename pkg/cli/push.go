@@ -32,7 +32,7 @@ func newPushCommand() *cobra.Command {
 		Args:   cobra.MinimumNArgs(1),
 	}
 
-	cmd.Flags().StringVarP(&sToken, "token", "t", "", "replicate cog token")
+	cmd.Flags().StringVarP(&sToken, "token", "t", "", "replicate api token")
 	cmd.Flags().StringVarP(&sRegistry, "registry", "r", "r8.im", "registry host")
 	cmd.Flags().StringVarP(&baseRef, "base", "b", "", "base image reference - include tag: r8.im/username/modelname@sha256:hexdigest")
 	cmd.MarkFlagRequired("base")
@@ -45,6 +45,10 @@ func newPushCommand() *cobra.Command {
 }
 
 func pushCommmand(cmd *cobra.Command, args []string) error {
+	if sToken == "" {
+		sToken = os.Getenv("REPLICATE_API_TOKEN")
+	}
+
 	if sToken == "" {
 		sToken = os.Getenv("COG_TOKEN")
 	}

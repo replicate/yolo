@@ -32,6 +32,7 @@ func VerifyCogToken(registryHost string, token string) (username string, err err
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to verify token, got status %d", resp.StatusCode)
 	}
+	defer resp.Body.Close()
 	body := &struct {
 		Username string `json:"username"`
 	}{}

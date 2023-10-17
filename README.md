@@ -16,7 +16,19 @@ This builds `./yolo`, you can install by copying into your path.
 
     sudo cp yolo /usr/local/bin
 
-### Get your Replicate CLI auth token
+### Get your Replicate token
+
+You can use **either** your REPLICATE_API_TOKEN or your COG_TOKEN.
+
+By using your REPLICATE_API_TOKEN, we can access the API and PUSH models to your account.
+
+#### Replicate API Token
+
+Visit https://replicate.com/account/api-tokens and copy your token.
+
+    export REPLICATE_API_TOKEN=r8_...
+
+#### Cog Token
 
 Visit https://replicate.com/auth/token and copy your token.
 
