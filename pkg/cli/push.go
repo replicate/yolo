@@ -58,7 +58,7 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 		fmt.Fprintln(os.Stderr, "authentication error, invalid token or registry host error")
 		return err
 	}
-	auth := authn.FromConfig(authn.AuthConfig{Username: u, Password: sToken})
+	session := authn.FromConfig(authn.AuthConfig{Username: u, Password: sToken})
 
 	tar, err := makeTar(args)
 	if err != nil {
@@ -68,7 +68,7 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 	baseRef = ensureRegistry(baseRef)
 	dest = ensureRegistry(dest)
 
-	image_id, err := images.Affix(baseRef, dest, tar, ast, commit, auth)
+	image_id, err := images.Affix(baseRef, dest, tar, ast, commit, session)
 	if err != nil {
 		return err
 	}
