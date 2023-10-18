@@ -30,6 +30,8 @@ func newFetchCommand() *cobra.Command {
 
 func fetchCommmand(cmd *cobra.Command, args []string) error {
 	dest := args[0]
+	var session authn.Authenticator
+
 	if sToken == "" {
 		sToken = os.Getenv("REPLICATE_API_TOKEN")
 	}
@@ -38,22 +40,19 @@ func fetchCommmand(cmd *cobra.Command, args []string) error {
 		sToken = os.Getenv("COG_TOKEN")
 	}
 
-	// FIXME(ja): support fetching public images without auth?
-	u, err := auth.VerifyCogToken(sRegistry, sToken)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "authentication error, invalid token or registry host error")
-		return err
+	if sToken == "" {
+		session = authn.Anonymous
+	} else {
+		u, err := auth.VerifyCogToken(sRegistry, sToken)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "authentication error, invalid token or registry host error")
+			return err
+		}
+		session = authn.FromConfig(authn.AuthConfig{Username: u, Password: sToken})
 	}
-	auth := authn.FromConfig(authn.AuthConfig{Username: u, Password: sToken})
 
 	baseRef = ensureRegistry(baseRef)
-
-	err = images.Extract(baseRef, dest, auth)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return images.Extract(baseRef, dest, session)
 }
 
 func ensureRegistry(baseRef string) string {
