@@ -8,13 +8,17 @@ A CLI for tweaking existing Cog models and deploying them to Replicate really fa
 
 ## Usage
 
-### Build on mac/linux
 
-    go build
+### Install on mac/linux
 
-This builds `./yolo`, you can install by copying into your path.
+Fetch the precompiled Go binary from GitHub Releases:
 
-    sudo cp yolo /usr/local/bin
+    sudo curl -o /usr/local/bin/yolo -L "https://github.com/replicate/yolo/releases/latest/download/yolo_$(uname -s)_$(uname -m)"
+    sudo chmod +x /usr/local/bin/yolo
+
+Alternatively can build from source (Golang required):
+
+    go build && sudo cp yolo /usr/local/bin
 
 ### Get your Replicate CLI auth token
 
