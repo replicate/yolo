@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/replicate/yolo/pkg/auth"
@@ -21,7 +22,7 @@ func newFetchCommand() *cobra.Command {
 
 	cmd.Flags().StringVarP(&sToken, "token", "t", "", "replicate api token")
 	cmd.Flags().StringVarP(&sRegistry, "registry", "r", "r8.im", "registry host")
-	cmd.Flags().StringVarP(&baseRef, "base", "b", "", "base image reference - include tag: r8.im/username/modelname@sha256:hexdigest")
+	cmd.Flags().StringVarP(&baseRef, "base", "b", "", "base image reference.  examples: owner/model or r8.im/owner/model@sha256:hexdigest")
 	cmd.MarkFlagRequired("base")
 
 	return cmd
@@ -45,10 +46,19 @@ func fetchCommmand(cmd *cobra.Command, args []string) error {
 	}
 	auth := authn.FromConfig(authn.AuthConfig{Username: u, Password: sToken})
 
+	baseRef = ensureRegistry(baseRef)
+
 	err = images.Extract(baseRef, dest, auth)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func ensureRegistry(baseRef string) string {
+	if !strings.Contains(baseRef, sRegistry) {
+		return sRegistry + "/" + baseRef
+	}
+	return baseRef
 }
