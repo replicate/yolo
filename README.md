@@ -1,13 +1,16 @@
 # yolo
 
-A CLI for tweaking existing Cog models and deploying them to Replicate really fast.
+An experimental CLI for tweaking existing Cog models and deploying them to Replicate really fast.
 
 - No Docker required
 - No Cog required
 - No GPU required
 
-## Usage
+## DISCLAIMER
 
+⚠️ This is a tool for power users that has many rough edges. ⚠️
+
+## Usage
 
 ### Install on mac/linux
 
