@@ -319,6 +319,10 @@ def get_value(node: ast.AST) -> "int | float | complex | str | list":
         return node.n
     if isinstance(node, (ast.List, ast.Tuple)):
         return [get_value(e) for e in node.elts]
+
+    print(f"Error on line {node.lineno}")
+
+
     raise ValueError("Unexpected node type", type(node))
 
 
