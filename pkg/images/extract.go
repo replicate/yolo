@@ -75,7 +75,7 @@ func extractTarFile(tarReader *tar.Reader, destDir string) error {
 				return err
 			}
 		case tar.TypeReg:
-			fmt.Println(target)
+			fmt.Fprintln(os.Stderr, target)
 			targetFile, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY, os.FileMode(header.Mode))
 			if err != nil {
 				return err
@@ -97,7 +97,7 @@ func extractTarFile(tarReader *tar.Reader, destDir string) error {
 	elapsed := time.Since(startTime).Seconds()
 	size := humanize.Bytes(uint64(_fileSize))
 	throughput := humanize.Bytes(uint64(float64(_fileSize) / elapsed))
-	fmt.Printf("Extracted %s in %.3fs (%s/s)\n", size, elapsed, throughput)
+	fmt.Fprintf(os.Stderr, "Extracted %s in %.3fs (%s/s)\n", size, elapsed, throughput)
 
 	return nil
 }

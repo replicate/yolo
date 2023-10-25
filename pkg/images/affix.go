@@ -124,7 +124,7 @@ func updatePredictor(img v1.Image, predictorToParse string) (v1.Image, error) {
 		return nil, err
 	}
 
-	fmt.Println("updating predictor to schema with length", len(schema))
+	fmt.Fprintln(os.Stderr, "updating predictor to schema with length", len(schema))
 
 	cfg.Config.Labels["org.cogmodel.openapi_schema"] = schema
 	cfg.Config.Labels["run.cog.openapi_schema"] = schema
