@@ -81,7 +81,10 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 
 	if sampleDir != "" {
 		fmt.Println("running samples")
-		auth.MakeSamples(image_id, sampleDir, session, sBaseApi)
+		err = auth.MakeSamples(image_id, sampleDir, sToken, sBaseApi)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
