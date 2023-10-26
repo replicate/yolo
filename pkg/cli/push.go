@@ -17,10 +17,12 @@ import (
 var (
 	sToken    string
 	sRegistry string
+	sBaseApi  string
 	baseRef   string
 	dest      string
 	ast       string
 	commit    string
+	sampleDir string
 )
 
 func newPushCommand() *cobra.Command {
@@ -40,6 +42,8 @@ func newPushCommand() *cobra.Command {
 	cmd.MarkFlagRequired("dest")
 	cmd.Flags().StringVarP(&ast, "ast", "a", "", "optional file to parse AST to update openapi schema")
 	cmd.Flags().StringVarP(&commit, "commit", "c", "", "optional commit hash to update git commit")
+	cmd.Flags().StringVarP(&sampleDir, "sample-dir", "s", "", "optional directory to run samples")
+	cmd.Flags().StringVarP(&sBaseApi, "test-api", "u", "http://localhost:4000", "experiment endpoint")
 
 	return cmd
 }
@@ -74,6 +78,11 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println(image_id)
+
+	if sampleDir != "" {
+		fmt.Println("running samples")
+		auth.MakeSamples(image_id, sampleDir, session, sBaseApi)
+	}
 
 	return nil
 }

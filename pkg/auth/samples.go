@@ -14,15 +14,6 @@ func MakeSamples(image_id string,
 	sampleDir string,
 	session authn.Authenticator, baseApi string) error {
 
-	// parts := strings.Split(image_id, "/")
-	// owner := parts[1]
-	// model := strings.Split(parts[2], "@")[0]
-	// version := strings.Split(parts[2], ":")[1]
-
-	// fmt.Println("Owner:", owner)
-	// fmt.Println("Model:", model)
-	// fmt.Println("Version:", version)
-
 	// for each json in sampleDir, run the sample
 	sampleFiles, err := os.ReadDir(sampleDir)
 	if err != nil {
