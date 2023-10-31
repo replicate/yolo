@@ -322,8 +322,6 @@ def get_value(node: ast.AST) -> "int | float | complex | str | list":
     if isinstance(node, ast.UnaryOp):
         if isinstance(node.op, ast.USub):
             return -get_value(node.operand)
-        if isinstance(node.op, ast.UAdd):
-            return get_value(node.operand)
 
     print(f"Error on line {node.lineno}")
 
