@@ -16,7 +16,7 @@ An experimental CLI for tweaking existing [Cog](https://github.com/replicate/cog
 
 Fetch the precompiled Go binary from GitHub Releases:
 
-    sudo curl -o /usr/local/bin/yolo -L "https://github.com/replicate/yolo/releases/latest/download/yolo_$(uname -s)_$(uname -m)"
+    sudo curl -o /usr/local/bin/yolo -L "https://github.com/replicate/yolo/releases/latest/download/$(if (test $(uname -m) = "arm64"); then echo "default."; else echo ""; fi)yolo_$(uname -s)_$(uname -m)"
     sudo chmod +x /usr/local/bin/yolo
 
 Alternatively can build from source (Golang required):
