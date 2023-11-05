@@ -319,6 +319,9 @@ def get_value(node: ast.AST) -> "int | float | complex | str | list":
         return node.n
     if isinstance(node, (ast.List, ast.Tuple)):
         return [get_value(e) for e in node.elts]
+    if isinstance(node, ast.UnaryOp):
+        if isinstance(node.op, ast.USub):
+            return -get_value(node.operand)
 
     print(f"Error on line {node.lineno}")
 
