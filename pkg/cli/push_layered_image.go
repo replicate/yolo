@@ -450,7 +450,7 @@ func main(args []string) error {
 			layers[index] = addLayerDir(store_layer, mtime, baseMediaType)
 		}(index, store_layer)
 	}
-	fmt.Fprintln(os.Stderr, "Creating layer", len(layers)+1, "with customisation...")
+	fmt.Fprintln(os.Stderr, "Creating layer", len(layers), "with customisation...")
 	/* go */ func() {
 		defer wg.Done()
 		layers[len(layers)-1] = addCustomizationLayer(conf.CustomisationLayer, mtime, layerType)
@@ -517,7 +517,10 @@ func main(args []string) error {
 			return fmt.Errorf("writing to local daemon: %w", err)
 		}
 	} else {
-		pushImage(image, conf.RepoTag, auth)
+		_, err = pushImage(image, conf.RepoTag, auth)
+		if err != nil {
+			return fmt.Errorf("pushing image: %w", err)
+		}
 	}
 	return nil
 }
