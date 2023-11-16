@@ -43,6 +43,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	writeLocal bool = false
+)
+
 // def load_from_image(from_image_str):
 //     """
 //     Loads the given base image, if any.
@@ -303,7 +307,7 @@ func addLayerDir(paths []string, mtime int64, layerType types.MediaType) mutate.
 //     )
 
 func addCustomizationLayer(customisation_layer string, mtime int64, layerType types.MediaType) mutate.Addendum {
-	// in python this is getting streaming into docker load, following that format for multiple layers
+	// in python this is getting streamed into docker load, following that format for multiple layers
 	// here we're just creating a layer object, we shouldn't even need to check the checksum
 	// 	// checksum_path := filepath.Join(customisation_layer, "checksum")
 	// 	// checksum := ""
@@ -317,7 +321,11 @@ func addCustomizationLayer(customisation_layer string, mtime int64, layerType ty
 	// 	// }
 	// 	// path := fmt.Sprintf("%s/layer.tar", checksum)
 
-	reader, _ := os.Open(filepath.Join(customisation_layer, "layer.tar"))
+	reader, err := os.Open(filepath.Join(customisation_layer, "layer.tar"))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error opening layer.tar", err)
+		return mutate.Addendum{}
+	}
 	layer := stream.NewLayer(io.NopCloser(reader), stream.WithMediaType(layerType))
 	history := v1.History{
 		Created: v1.Time{Time: time.Unix(int64(mtime), 0)},
@@ -362,7 +370,7 @@ func overlayBaseConfig(base_config v1.Config, final_config v1.Config) v1.Config 
 }
 
 type Conf struct {
-	FromImage          string     `json:"from_image",omitempty`
+	FromImage          string     `json:"from_image"`
 	StoreLayers        [][]string `json:"store_layers"`
 	CustomisationLayer string     `json:"customisation_layer"`
 	RepoTag            string     `json:"repo_tag"`
@@ -386,10 +394,14 @@ func checkValidPaths(conf Conf) error {
 	return nil
 }
 
-func main() error {
-	conf_bytes, _ := os.ReadFile(os.Args[1])
+func main(args []string) error {
+	conf_bytes, _ := os.ReadFile(args[0])
 	var conf Conf
-	json.Unmarshal(conf_bytes, &conf)
+	err := json.Unmarshal(conf_bytes, &conf)
+	if err != nil {
+		return fmt.Errorf("parsing config: %w", err)
+	}
+
 	checkValidPaths(conf)
 
 	created := time.Now()
@@ -421,17 +433,25 @@ func main() error {
 	wg.Add(len(conf.StoreLayers) + 1)
 	for index, store_layer := range conf.StoreLayers {
 		fmt.Fprintln(os.Stderr, "Creating layer", start+index, "from paths:", store_layer)
-		go func(index int, store_layer []string) {
+		/* go */ func(index int, store_layer []string) {
 			defer wg.Done()
 			layers[index] = addLayerDir(store_layer, mtime, baseMediaType)
 		}(index, store_layer)
 	}
 	fmt.Fprintln(os.Stderr, "Creating layer", len(layers)+1, "with customisation...")
-	go func() {
+	/* go */ func() {
 		defer wg.Done()
 		layers[len(layers)-1] = addCustomizationLayer(conf.CustomisationLayer, mtime, layerType)
 	}()
 	wg.Wait()
+	// if the last layer is nil, remove it
+	// this is dumb, for testing purposes
+	if layers[len(layers)-1].Layer == nil {
+		layers = layers[:len(layers)-1]
+	}
+	// print out raw values of layers
+	fmt.Fprintln(os.Stderr, "layers:", layers)
+
 	image, err := mutate.Append(from_image, layers...)
 	if err != nil {
 		return fmt.Errorf("appending layers: %w", err)
@@ -454,7 +474,10 @@ func main() error {
 	// 		for layer in layers
 	// 	],
 	// }
-	configFile, _ := image.ConfigFile()
+	configFile, err := from_image.ConfigFile()
+	if err != nil {
+		return fmt.Errorf("getting config file: %w", err)
+	}
 	configFile.Config = overlayBaseConfig(configFile.Config, conf.Config)
 	configFile.Created = v1.Time{Time: created}
 	configFile.Architecture = conf.Architecture
@@ -465,9 +488,16 @@ func main() error {
 	// RepoTags are a property of the tarball image representation, not the image itself
 	// we could tag it, but that gets passed to crane.Push seately
 
-	if os.Args[2] == "--local" {
-		tag, _ := name.NewTag(conf.RepoTag)
-		daemon.Write(tag, image)
+	if writeLocal {
+		fmt.Println("writing to local daemon, tag:", conf.RepoTag)
+		tag, err := name.NewTag(conf.RepoTag)
+		if err != nil {
+			return fmt.Errorf("parsing tag: %w", err)
+		}
+		_, err = daemon.Write(tag, image)
+		if err != nil {
+			return fmt.Errorf("writing to local daemon: %w", err)
+		}
 	} else {
 		pushImage(image, conf.RepoTag, auth)
 	}
@@ -510,5 +540,18 @@ func getAuth() authn.Authenticator {
 }
 
 func pushLayeredImageCommmand(cmd *cobra.Command, args []string) error {
-	return main()
+	return main(args)
+}
+
+func newPushLayeredImageCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:    "stream_layered_image",
+		Short:  "update an existing image",
+		Hidden: false,
+		RunE:   pushLayeredImageCommmand,
+		Args:   cobra.ExactArgs(1),
+	}
+	cmd.Flags().BoolVarP(&writeLocal, "local", "l", false, "write to local daemon instead of pushing")
+	cmd.Flags().StringVarP(&sToken, "token", "t", "", "replicate api token")
+	return cmd
 }
