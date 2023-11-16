@@ -44,8 +44,15 @@ import (
 )
 
 var (
-	writeLocal bool = false
+	writeLocal = false
+	debugMode  = os.Getenv("DEBUG") != ""
 )
+
+func debug(msg ...any) {
+	if debugMode {
+		fmt.Fprintln(os.Stderr, msg...)
+	}
+}
 
 // def load_from_image(from_image_str):
 //     """
@@ -66,9 +73,6 @@ var (
 //     return FromImage(base_tar, manifest_json, image_json)
 
 func fetchFromImage(baseRef string, auth authn.Authenticator) (v1.Image, error) {
-	if baseRef == "" {
-		return empty.Image, nil
-	}
 	fmt.Fprintln(os.Stderr, "fetching metadata for", baseRef)
 	start := time.Now()
 	base, err := crane.Pull(baseRef, crane.WithAuth(auth))
@@ -320,10 +324,10 @@ func addCustomizationLayer(customisation_layer string, mtime int64, layerType ty
 	// 	// 	fmt.Fprintln(os.Stderr, "Invalid sha256 at", checksum_path)
 	// 	// }
 	// 	// path := fmt.Sprintf("%s/layer.tar", checksum)
-
-	reader, err := os.Open(filepath.Join(customisation_layer, "layer.tar"))
+	path := fmt.Sprintf("%s/layer.tar", customisation_layer)
+	reader, err := os.Open(path)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "error opening layer.tar", err)
+		fmt.Fprintln(os.Stderr, "error opening", path, err)
 		return mutate.Addendum{}
 	}
 	layer := stream.NewLayer(io.NopCloser(reader), stream.WithMediaType(layerType))
@@ -412,7 +416,15 @@ func main(args []string) error {
 
 	auth := getAuth()
 	// from_image = load_from_image(conf["from_image"])
-	from_image, _ := fetchFromImage(conf.FromImage, auth)
+	from_image := empty.Image
+	configFile := &v1.ConfigFile{}
+	if conf.FromImage != "" {
+		from_image, _ = fetchFromImage(conf.FromImage, auth)
+		configFile, err = from_image.ConfigFile()
+		if err != nil || configFile == nil {
+			return fmt.Errorf("getting base image config file: %w", err)
+		}
+	}
 
 	baseMediaType, _ := from_image.MediaType()
 	// if err != nil {
@@ -450,12 +462,14 @@ func main(args []string) error {
 		layers = layers[:len(layers)-1]
 	}
 	// print out raw values of layers
-	fmt.Fprintln(os.Stderr, "layers:", layers)
-
+	debug("layers:", layers)
+	debug("from_image", from_image)
+	debug("running mutate.Append(from_image, layers...)")
 	image, err := mutate.Append(from_image, layers...)
-	if err != nil {
+	if err != nil || image == nil {
 		return fmt.Errorf("appending layers: %w", err)
 	}
+	debug("resulting image is now:", image)
 
 	// image_json = {
 	// 	"created": datetime.isoformat(created),
@@ -474,16 +488,20 @@ func main(args []string) error {
 	// 		for layer in layers
 	// 	],
 	// }
-	configFile, err := from_image.ConfigFile()
-	if err != nil {
-		return fmt.Errorf("getting config file: %w", err)
-	}
+
 	configFile.Config = overlayBaseConfig(configFile.Config, conf.Config)
 	configFile.Created = v1.Time{Time: created}
 	configFile.Architecture = conf.Architecture
 	configFile.OS = "linux"
-
+	debug("image", image)
+	debug("configFile", configFile)
+	debug("running mutate.ConfigFile(image, configFile)")
 	image, err = mutate.ConfigFile(image, configFile)
+
+	debug("resulting image is now:", image)
+	if err != nil {
+		return fmt.Errorf("setting config file: %w", err)
+	}
 
 	// RepoTags are a property of the tarball image representation, not the image itself
 	// we could tag it, but that gets passed to crane.Push seately
