@@ -18,6 +18,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"archive/tar"
@@ -361,7 +362,7 @@ func overlayBaseConfig(base_config v1.Config, final_config v1.Config) v1.Config 
 }
 
 type Conf struct {
-	FromImage          string     `json:"from_image"`
+	FromImage          string     `json:"from_image",omitempty`
 	StoreLayers        [][]string `json:"store_layers"`
 	CustomisationLayer string     `json:"customisation_layer"`
 	RepoTag            string     `json:"repo_tag"`
@@ -415,16 +416,22 @@ func main() error {
 		m, _ := from_image.Manifest()
 		start = len(m.Layers) + 1
 	}
-	var layers []mutate.Addendum
+	layers := make([]mutate.Addendum, len(conf.StoreLayers)+1)
+	var wg sync.WaitGroup
+	wg.Add(len(conf.StoreLayers) + 1)
 	for index, store_layer := range conf.StoreLayers {
 		fmt.Fprintln(os.Stderr, "Creating layer", start+index, "from paths:", store_layer)
-		layer := addLayerDir(store_layer, mtime, baseMediaType)
-		layers = append(layers, layer)
+		go func(index int, store_layer []string) {
+			defer wg.Done()
+			layers[index] = addLayerDir(store_layer, mtime, baseMediaType)
+		}(index, store_layer)
 	}
 	fmt.Fprintln(os.Stderr, "Creating layer", len(layers)+1, "with customisation...")
-	layer := addCustomizationLayer(conf.CustomisationLayer, mtime, layerType)
-	layers = append(layers, layer)
-
+	go func() {
+		defer wg.Done()
+		layers[len(layers)-1] = addCustomizationLayer(conf.CustomisationLayer, mtime, layerType)
+	}()
+	wg.Wait()
 	image, err := mutate.Append(from_image, layers...)
 	if err != nil {
 		return fmt.Errorf("appending layers: %w", err)
