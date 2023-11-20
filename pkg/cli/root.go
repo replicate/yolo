@@ -20,6 +20,7 @@ func NewRootCommand() (*cobra.Command, error) {
 		newPushCommand(),
 		newFetchCommand(),
 		newDepsCommand(),
+		newServeCommand(),
 	)
 	logs.Warn = log.New(os.Stderr, "gcr WARN: ", log.LstdFlags)
 	logs.Progress = log.New(os.Stderr, "gcr: ", log.LstdFlags)
