@@ -62,13 +62,11 @@ func depsCommmand(cmd *cobra.Command, args []string) error {
 		fmt.Println(apt)
 	}
 
-	if len(config.Build.PythonPackages) > 0 {
-		pip := "python3 -m pip install --no-cache-dir"
-		for _, pkg := range config.Build.PythonPackages {
-			pip += " \"" + pkg + "\""
-		}
-		fmt.Println(pip)
+	pip := "python3 -m pip install --no-cache-dir cog"
+	for _, pkg := range config.Build.PythonPackages {
+		pip += " \"" + pkg + "\""
 	}
+	fmt.Println(pip)
 
 	for _, run := range config.Build.Run {
 		fmt.Println(run.Command)
