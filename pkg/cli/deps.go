@@ -62,7 +62,7 @@ func depsCommmand(cmd *cobra.Command, args []string) error {
 		fmt.Println(apt)
 	}
 
-	pip := "python3 -m pip install --no-cache-dir cog"
+	pip := "python3 -m pip install -U cog"
 	for _, pkg := range config.Build.PythonPackages {
 		pip += " \"" + pkg + "\""
 	}
