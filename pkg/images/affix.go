@@ -52,11 +52,27 @@ func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse
 	// FIXME(ja): find any YOLOs in the history and remove them?  We don't want to grow the history forever
 
 	fmt.Fprintln(os.Stderr, "appending as new layer")
+	var img v1.Image
 
 	start = time.Now()
-	img, err := appendLayer(base, newLayer)
-	if err != nil {
-		return "", fmt.Errorf("appending %v: %w", newLayer, err)
+	if newLayer == nil {
+		cfg, err := base.ConfigFile()
+		if err != nil {
+			return "", fmt.Errorf("getting config file: %w", err)
+		}
+
+		cfg.Config.Labels["cloned"] = time.Now().String()
+
+		img, err = mutate.ConfigFile(base, cfg)
+		if err != nil {
+			return "", fmt.Errorf("mutating config file: %w", err)
+		}
+	} else {
+		img, err = appendLayer(base, newLayer)
+
+		if err != nil {
+			return "", fmt.Errorf("appending %v: %w", newLayer, err)
+		}
 	}
 	fmt.Fprintln(os.Stderr, "appending took", time.Since(start))
 
