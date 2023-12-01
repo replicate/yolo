@@ -140,7 +140,7 @@ func removeYolo(orig v1.Image) (v1.Image, error) {
 		return nil, fmt.Errorf("failed to get config for original: %w", err)
 	}
 
-	rebasedImage, err := mutate.Config(empty.Image, *config.Config.DeepCopy())
+	yololessImage, err := mutate.Config(empty.Image, *config.Config.DeepCopy())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create empty image with original config: %w", err)
 	}
@@ -158,7 +158,7 @@ func removeYolo(orig v1.Image) (v1.Image, error) {
 			}
 
 			fmt.Println("adding layer", add.Layer, "with history", h)
-			rebasedImage, err = mutate.Append(rebasedImage, add)
+			yololessImage, err = mutate.Append(yololessImage, add)
 			if err != nil {
 				return nil, fmt.Errorf("failed to add layer: %w", err)
 			}
@@ -169,5 +169,5 @@ func removeYolo(orig v1.Image) (v1.Image, error) {
 		}
 	}
 
-	return rebasedImage, nil
+	return yololessImage, nil
 }
