@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/replicate/yolo/pkg/auth"
 	"github.com/replicate/yolo/pkg/images"
 	"github.com/spf13/cobra"
@@ -56,20 +55,6 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 	baseRef = images.EnsureRegistry(baseRef)
 	dest = images.EnsureRegistry(dest)
 
-	base, err := crane.Pull(baseRef, crane.WithAuth(session))
-	if err != nil {
-		return fmt.Errorf("pulling %w", err)
-	}
-
-	// FIXME(ja): I think there should be a method images.UpdateYolo
-	// that takes the new files and updates the yolo if it exists
-	// -- Affix is too low level for this?
-
-	yoloLayers, err := images.GetSourceLayers(base, false, true)
-	if err != nil {
-		return err
-	}
-
 	var files []images.LayerFile
 	for _, path := range args {
 		body, err := os.ReadFile(path)
@@ -96,12 +81,7 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 		files = append(files, file)
 	}
 
-	tar, err := images.MakeTar(files, yoloLayers)
-	if err != nil {
-		return err
-	}
-
-	image_id, err := images.Affix(baseRef, dest, tar, ast, commit, session)
+	image_id, err := images.Yolo(baseRef, dest, files, ast, commit, session)
 	if err != nil {
 		return err
 	}
