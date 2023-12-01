@@ -30,24 +30,25 @@ func Extract(baseRef string, dest string, auth authn.Authenticator) error {
 		return fmt.Errorf("pulling %w", err)
 	}
 
-	layers, err := base.Layers()
-	if err != nil {
-		return fmt.Errorf("getting layers %w", err)
-	}
-
-	// FIXME(ja): don't assume the most recent layer is right!
-	// example: if this was yolo'd we should extract the src layer and then
-	// the yolo layer
-
-	layer := layers[len(layers)-1]
-
-	rc, err := layer.Uncompressed()
+	src, err := GetSourceLayers(base, true, true)
 	if err != nil {
 		return err
 	}
 
-	tr := tar.NewReader(rc)
-	return extractTarFile(tr, dest)
+	for _, layer := range src {
+		rc, err := layer.Uncompressed()
+		if err != nil {
+			return err
+		}
+
+		tr := tar.NewReader(rc)
+		err = extractTarFile(tr, dest)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func extractTarFile(tarReader *tar.Reader, destDir string) error {
@@ -94,6 +95,7 @@ func extractTarFile(tarReader *tar.Reader, destDir string) error {
 			return fmt.Errorf("unsupported file type for %s, typeflag %s", header.Name, string(header.Typeflag))
 		}
 	}
+
 	elapsed := time.Since(startTime).Seconds()
 	size := humanize.Bytes(uint64(_fileSize))
 	throughput := humanize.Bytes(uint64(float64(_fileSize) / elapsed))
