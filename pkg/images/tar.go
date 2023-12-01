@@ -86,6 +86,8 @@ func MakeTar(args []string, relative bool, layers []v1.Layer) (*bytes.Buffer, er
 			if _, err := io.Copy(tw, tr); err != nil {
 				return nil, err
 			}
+
+			added[header.Name] = struct{}{}
 		}
 	}
 
