@@ -3,10 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
-	"strings"
 
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/replicate/yolo/pkg/auth"
 	"github.com/replicate/yolo/pkg/images"
 	"github.com/spf13/cobra"
 )
@@ -30,34 +27,13 @@ func newFetchCommand() *cobra.Command {
 
 func fetchCommmand(cmd *cobra.Command, args []string) error {
 	dest := args[0]
-	var session authn.Authenticator
 
-	if sToken == "" {
-		sToken = os.Getenv("REPLICATE_API_TOKEN")
-	}
-
-	if sToken == "" {
-		sToken = os.Getenv("COG_TOKEN")
-	}
-
-	if sToken == "" {
-		session = authn.Anonymous
-	} else {
-		u, err := auth.VerifyCogToken(sRegistry, sToken)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "authentication error, invalid token or registry host error")
-			return err
-		}
-		session = authn.FromConfig(authn.AuthConfig{Username: u, Password: sToken})
+	session := authenticate()
+	if session == nil {
+		fmt.Fprintln(os.Stderr, "authentication error, invalid token or registry host error")
+		return nil
 	}
 
 	baseRef = ensureRegistry(baseRef)
 	return images.Extract(baseRef, dest, session)
-}
-
-func ensureRegistry(baseRef string) string {
-	if !strings.Contains(baseRef, sRegistry) {
-		return sRegistry + "/" + baseRef
-	}
-	return baseRef
 }

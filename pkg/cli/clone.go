@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/replicate/yolo/pkg/auth"
 	"github.com/replicate/yolo/pkg/images"
 	"github.com/spf13/cobra"
 )
@@ -30,29 +28,15 @@ func newCloneCommand() *cobra.Command {
 }
 
 func cloneCommmand(cmd *cobra.Command, args []string) error {
-	var session authn.Authenticator
-
-	if sToken == "" {
-		sToken = os.Getenv("REPLICATE_API_TOKEN")
-	}
-
-	if sToken == "" {
-		sToken = os.Getenv("COG_TOKEN")
-	}
-
-	if sToken == "" {
-		session = authn.Anonymous
-	} else {
-		u, err := auth.VerifyCogToken(sRegistry, sToken)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "authentication error, invalid token or registry host error")
-			return err
-		}
-		session = authn.FromConfig(authn.AuthConfig{Username: u, Password: sToken})
+	session := authenticate()
+	if session == nil {
+		fmt.Fprintln(os.Stderr, "authentication error, invalid token or registry host error")
+		return nil
 	}
 
 	baseRef = ensureRegistry(baseRef)
 	dest = ensureRegistry(dest)
+
 	image_id, err := images.Affix(baseRef, dest, nil, "", "", session)
 	if err != nil {
 		return err

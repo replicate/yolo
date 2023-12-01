@@ -13,6 +13,8 @@ builds:
       - amd64
       - arm64
     main: ./yolo.go
+    ldflags:
+      - "-s -w -X github.com/replicate/yolo/pkg/version.Version={{.Version}} -X github.com/replicate/yolo/pkg/version.CommitHash={{.Commit}} -X github.com/replicate/cog/pkg/version.BuildTime={{.Date}}"
 archives:
   - format: binary
     name_template: >-
