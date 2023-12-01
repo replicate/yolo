@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/replicate/yolo/pkg/auth"
 	"github.com/replicate/yolo/pkg/images"
 	"github.com/spf13/cobra"
@@ -49,20 +48,11 @@ func newPushCommand() *cobra.Command {
 }
 
 func pushCommmand(cmd *cobra.Command, args []string) error {
-	if sToken == "" {
-		sToken = os.Getenv("REPLICATE_API_TOKEN")
-	}
-
-	if sToken == "" {
-		sToken = os.Getenv("COG_TOKEN")
-	}
-
-	u, err := auth.VerifyCogToken(sRegistry, sToken)
-	if err != nil {
+	session := authenticate()
+	if session == nil {
 		fmt.Fprintln(os.Stderr, "authentication error, invalid token or registry host error")
-		return err
+		return nil
 	}
-	session := authn.FromConfig(authn.AuthConfig{Username: u, Password: sToken})
 
 	tar, err := makeTar(args)
 	if err != nil {
