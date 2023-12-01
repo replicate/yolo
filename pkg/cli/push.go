@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"archive/tar"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/replicate/yolo/pkg/auth"
@@ -59,15 +61,42 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("pulling %w", err)
 	}
 
+	// FIXME(ja): I think there should be a method images.UpdateYolo
+	// that takes the new files and updates the yolo if it exists
+	// -- Affix is too low level for this?
+
 	yoloLayers, err := images.GetSourceLayers(base, false, true)
 	if err != nil {
 		return err
 	}
 
-	// FIXME(ja): I think there should be a method images.UpdateYolo
-	// that takes the new files and updates the yolo if it exists
-	// -- Affix is too low level for this?
-	tar, err := images.MakeTar(args, relativePaths, yoloLayers)
+	var files []images.LayerFile
+	for _, path := range args {
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		var dest string
+		if relativePaths {
+			dest = filepath.Join("src", path)
+		} else {
+			baseName := filepath.Base(path)
+			dest = filepath.Join("src", baseName)
+		}
+		file := images.LayerFile{
+			Header: &tar.Header{
+				Name: dest,
+				Mode: 0644,
+				Size: int64(len(body)),
+			},
+			Body: body,
+		}
+
+		files = append(files, file)
+	}
+
+	tar, err := images.MakeTar(files, yoloLayers)
 	if err != nil {
 		return err
 	}

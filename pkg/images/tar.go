@@ -6,52 +6,32 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
-func MakeTar(args []string, relative bool, layers []v1.Layer) (*bytes.Buffer, error) {
+type LayerFile struct {
+	Header *tar.Header
+	Body   []byte
+}
+
+func MakeTar(files []LayerFile, layers []v1.Layer) (*bytes.Buffer, error) {
 	added := make(map[string]struct{})
 
 	buf := new(bytes.Buffer)
 	tw := tar.NewWriter(buf)
 
-	for _, file := range args {
-		f, err := os.Open(file)
-		if err != nil {
+	for _, file := range files {
+		fmt.Fprintln(os.Stderr, "adding:", file.Header.Name)
+
+		if err := tw.WriteHeader(file.Header); err != nil {
 			return nil, err
 		}
-		defer f.Close()
-
-		stat, err := f.Stat()
-		if err != nil {
+		if _, err := tw.Write(file.Body); err != nil {
 			return nil, err
 		}
 
-		var dest string
-		if relative {
-			dest = filepath.Join("src", file)
-		} else {
-			baseName := filepath.Base(file)
-			dest = filepath.Join("src", baseName)
-		}
-
-		fmt.Fprintln(os.Stderr, "adding:", dest)
-
-		hdr := &tar.Header{
-			Name: dest,
-			Mode: int64(stat.Mode()),
-			Size: stat.Size(),
-		}
-		added[hdr.Name] = struct{}{}
-
-		if err := tw.WriteHeader(hdr); err != nil {
-			return nil, err
-		}
-		if _, err := io.Copy(tw, f); err != nil {
-			return nil, err
-		}
+		added[file.Header.Name] = struct{}{}
 	}
 
 	// we need to add all the layers in reverse order, so that files from
@@ -89,6 +69,8 @@ func MakeTar(args []string, relative bool, layers []v1.Layer) (*bytes.Buffer, er
 
 			added[header.Name] = struct{}{}
 		}
+
+		rc.Close()
 	}
 
 	if err := tw.Close(); err != nil {
