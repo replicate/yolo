@@ -22,11 +22,8 @@ var script string
 
 func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse string, commit string, session authn.Authenticator) (string, error) {
 
-	var base v1.Image
-	var err error
-
 	fmt.Fprintln(os.Stderr, "fetching metadata for", baseRef)
-	base, err = crane.Pull(baseRef, crane.WithAuth(session))
+	base, err := crane.Pull(baseRef, crane.WithAuth(session))
 	if err != nil {
 		return "", fmt.Errorf("pulling %w", err)
 	}

@@ -1,13 +1,10 @@
 package cli
 
 import (
-	"archive/tar"
-	"bytes"
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
 
+	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/replicate/yolo/pkg/auth"
 	"github.com/replicate/yolo/pkg/images"
 	"github.com/spf13/cobra"
@@ -54,13 +51,26 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	tar, err := makeTar(args)
+	baseRef = images.EnsureRegistry(baseRef)
+	dest = images.EnsureRegistry(dest)
+
+	base, err := crane.Pull(baseRef, crane.WithAuth(session))
+	if err != nil {
+		return fmt.Errorf("pulling %w", err)
+	}
+
+	yoloLayers, err := images.GetSourceLayers(base, false, true)
 	if err != nil {
 		return err
 	}
 
-	baseRef = images.EnsureRegistry(baseRef)
-	dest = images.EnsureRegistry(dest)
+	// FIXME(ja): I think there should be a method images.UpdateYolo
+	// that takes the new files and updates the yolo if it exists
+	// -- Affix is too low level for this?
+	tar, err := images.MakeTar(args, relativePaths, yoloLayers)
+	if err != nil {
+		return err
+	}
 
 	image_id, err := images.Affix(baseRef, dest, tar, ast, commit, session)
 	if err != nil {
@@ -78,48 +88,4 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-func makeTar(args []string) (*bytes.Buffer, error) {
-	buf := new(bytes.Buffer)
-	tw := tar.NewWriter(buf)
-
-	for _, file := range args {
-		f, err := os.Open(file)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-
-		stat, err := f.Stat()
-		if err != nil {
-			return nil, err
-		}
-		var dest string
-		if relativePaths {
-			dest = filepath.Join("src", file)
-		} else {
-			baseName := filepath.Base(file)
-			dest = filepath.Join("src", baseName)
-		}
-		fmt.Fprintln(os.Stderr, "adding:", dest)
-
-		hdr := &tar.Header{
-			Name: dest,
-			Mode: int64(stat.Mode()),
-			Size: stat.Size(),
-		}
-		if err := tw.WriteHeader(hdr); err != nil {
-			return nil, err
-		}
-		if _, err := io.Copy(tw, f); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := tw.Close(); err != nil {
-		return nil, err
-	}
-
-	return buf, nil
 }

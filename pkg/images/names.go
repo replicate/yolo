@@ -8,6 +8,10 @@ import (
 )
 
 func EnsureRegistry(baseRef string) string {
+	if strings.Contains(baseRef, ":") && !strings.Contains(baseRef, "@") {
+		sha := strings.Split(baseRef, ":")[1]
+		baseRef = strings.Split(baseRef, ":")[0] + "@sha256:" + sha
+	}
 	if !strings.Contains(baseRef, "r8.im") {
 		return "r8.im/" + baseRef
 	}
