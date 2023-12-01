@@ -20,19 +20,16 @@ import (
 //go:embed ast_openapi_schema.py
 var script string
 
-func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse string, commit string, auth authn.Authenticator) (string, error) {
+func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse string, commit string, session authn.Authenticator) (string, error) {
 
 	var base v1.Image
 	var err error
 
 	fmt.Fprintln(os.Stderr, "fetching metadata for", baseRef)
-
-	start := time.Now()
-	base, err = crane.Pull(baseRef, crane.WithAuth(auth))
+	base, err = crane.Pull(baseRef, crane.WithAuth(session))
 	if err != nil {
 		return "", fmt.Errorf("pulling %w", err)
 	}
-	fmt.Fprintln(os.Stderr, "pulling took", time.Since(start))
 
 	// try to parse the predictor if it's provided
 	if predictorToParse != "" {
@@ -45,7 +42,7 @@ func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse
 	if commit != "" {
 		base, err = updateCommit(base, commit)
 		if err != nil {
-			return "", fmt.Errorf("updating predictor: %w", err)
+			return "", fmt.Errorf("updating commit: %w", err)
 		}
 	}
 
@@ -54,44 +51,20 @@ func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse
 	fmt.Fprintln(os.Stderr, "appending as new layer")
 	var img v1.Image
 
-	start = time.Now()
-	if newLayer == nil {
-		cfg, err := base.ConfigFile()
-		if err != nil {
-			return "", fmt.Errorf("getting config file: %w", err)
-		}
-
-		cfg.Config.Labels["cloned"] = time.Now().String()
-
-		img, err = mutate.ConfigFile(base, cfg)
-		if err != nil {
-			return "", fmt.Errorf("mutating config file: %w", err)
-		}
-	} else {
-		img, err = appendLayer(base, newLayer)
-
-		if err != nil {
-			return "", fmt.Errorf("appending %v: %w", newLayer, err)
-		}
+	img, err = appendLayer(base, newLayer)
+	if err != nil {
+		return "", fmt.Errorf("appending %v: %w", newLayer, err)
 	}
-	fmt.Fprintln(os.Stderr, "appending took", time.Since(start))
 
 	// --- pushing image
-	start = time.Now()
-
-	err = crane.Push(img, dest, crane.WithAuth(auth))
+	start := time.Now()
+	err = crane.Push(img, dest, crane.WithAuth(session))
 	if err != nil {
 		return "", fmt.Errorf("pushing %s: %w", dest, err)
 	}
-
 	fmt.Fprintln(os.Stderr, "pushing took", time.Since(start))
 
-	d, err := img.Digest()
-	if err != nil {
-		return "", err
-	}
-	image_id := fmt.Sprintf("%s@%s", dest, d)
-	return image_id, nil
+	return ImageId(dest, img)
 }
 
 // All of this code is from pkg/v1/mutate - so we can add history and use a tarball

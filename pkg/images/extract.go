@@ -14,7 +14,7 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
-func Extract(baseRef string, dest string, auth authn.Authenticator) error {
+func Extract(baseRef string, dest string, session authn.Authenticator) error {
 	var err error
 
 	if _, err = os.Stat(dest); !os.IsNotExist(err) {
@@ -25,7 +25,7 @@ func Extract(baseRef string, dest string, auth authn.Authenticator) error {
 
 	fmt.Fprintln(os.Stderr, "fetching metadata for", baseRef)
 
-	base, err = crane.Pull(baseRef, crane.WithAuth(auth))
+	base, err = crane.Pull(baseRef, crane.WithAuth(session))
 	if err != nil {
 		return fmt.Errorf("pulling %w", err)
 	}

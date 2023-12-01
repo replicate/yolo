@@ -14,14 +14,13 @@ import (
 )
 
 var (
-	sToken    string
-	sRegistry string
-	sBaseApi  string
-	baseRef   string
-	dest      string
-	ast       string
-	commit    string
-	sampleDir string
+	sToken        string
+	sBaseApi      string
+	baseRef       string
+	dest          string
+	ast           string
+	commit        string
+	sampleDir     string
 	relativePaths bool
 )
 
@@ -35,7 +34,6 @@ func newPushCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&sToken, "token", "t", "", "replicate api token")
-	cmd.Flags().StringVarP(&sRegistry, "registry", "r", "r8.im", "registry host")
 	cmd.Flags().BoolVarP(&relativePaths, "relative-paths", "p", false, "preserve relative paths from where yolo is run instead of placing all files under /src")
 	cmd.Flags().StringVarP(&baseRef, "base", "b", "", "base image reference.  examples: owner/model or r8.im/owner/model@sha256:hexdigest")
 	cmd.MarkFlagRequired("base")
@@ -61,8 +59,8 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	baseRef = ensureRegistry(baseRef)
-	dest = ensureRegistry(dest)
+	baseRef = images.EnsureRegistry(baseRef)
+	dest = images.EnsureRegistry(dest)
 
 	image_id, err := images.Affix(baseRef, dest, tar, ast, commit, session)
 	if err != nil {

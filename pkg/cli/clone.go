@@ -18,7 +18,6 @@ func newCloneCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&sToken, "token", "t", "", "replicate api token")
-	cmd.Flags().StringVarP(&sRegistry, "registry", "r", "r8.im", "registry host")
 	cmd.Flags().StringVarP(&baseRef, "base", "b", "", "base image reference.  examples: owner/model or r8.im/owner/model@sha256:hexdigest")
 	cmd.Flags().StringVarP(&dest, "dest", "d", "", "destination image. examples: owner/model or r8.im/owner/model")
 	cmd.MarkFlagRequired("base")
@@ -34,10 +33,10 @@ func cloneCommmand(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	baseRef = ensureRegistry(baseRef)
-	dest = ensureRegistry(dest)
+	baseRef = images.EnsureRegistry(baseRef)
+	dest = images.EnsureRegistry(dest)
 
-	image_id, err := images.Affix(baseRef, dest, nil, "", "", session)
+	image_id, err := images.Clone(baseRef, dest, session)
 	if err != nil {
 		return err
 	}

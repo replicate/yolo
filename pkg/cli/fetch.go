@@ -18,7 +18,6 @@ func newFetchCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&sToken, "token", "t", "", "replicate api token")
-	cmd.Flags().StringVarP(&sRegistry, "registry", "r", "r8.im", "registry host")
 	cmd.Flags().StringVarP(&baseRef, "base", "b", "", "base image reference.  examples: owner/model or r8.im/owner/model@sha256:hexdigest")
 	cmd.MarkFlagRequired("base")
 
@@ -34,6 +33,6 @@ func fetchCommmand(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	baseRef = ensureRegistry(baseRef)
+	baseRef = images.EnsureRegistry(baseRef)
 	return images.Extract(baseRef, dest, session)
 }
