@@ -6,92 +6,71 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/stream"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
-//go:embed ast_openapi_schema.py
-var script string
-
-func Affix(baseRef string, dest string, newLayer *bytes.Buffer, predictorToParse string, commit string, auth authn.Authenticator) (string, error) {
-
-	var base v1.Image
-	var err error
-
+func Yolo(baseRef string, dest string, files []LayerFile, predictorToParse string, commit string, session authn.Authenticator) (string, error) {
 	fmt.Fprintln(os.Stderr, "fetching metadata for", baseRef)
-
-	start := time.Now()
-	base, err = crane.Pull(baseRef, crane.WithAuth(auth))
+	base, err := crane.Pull(baseRef, crane.WithAuth(session))
 	if err != nil {
 		return "", fmt.Errorf("pulling %w", err)
 	}
-	fmt.Fprintln(os.Stderr, "pulling took", time.Since(start))
+
+	yoloLess, err := removeYolo(base)
+	if err != nil {
+		return "", fmt.Errorf("removing existing yolo layers: %w", err)
+	}
 
 	// try to parse the predictor if it's provided
 	if predictorToParse != "" {
-		base, err = updatePredictor(base, predictorToParse)
+		yoloLess, err = updatePredictor(yoloLess, predictorToParse)
 		if err != nil {
 			return "", fmt.Errorf("updating predictor: %w", err)
 		}
 	}
 
 	if commit != "" {
-		base, err = updateCommit(base, commit)
+		yoloLess, err = updateCommit(yoloLess, commit)
 		if err != nil {
-			return "", fmt.Errorf("updating predictor: %w", err)
+			return "", fmt.Errorf("updating commit: %w", err)
 		}
 	}
-
-	// FIXME(ja): find any YOLOs in the history and remove them?  We don't want to grow the history forever
 
 	fmt.Fprintln(os.Stderr, "appending as new layer")
 	var img v1.Image
 
-	start = time.Now()
-	if newLayer == nil {
-		cfg, err := base.ConfigFile()
-		if err != nil {
-			return "", fmt.Errorf("getting config file: %w", err)
-		}
-
-		cfg.Config.Labels["cloned"] = time.Now().String()
-
-		img, err = mutate.ConfigFile(base, cfg)
-		if err != nil {
-			return "", fmt.Errorf("mutating config file: %w", err)
-		}
-	} else {
-		img, err = appendLayer(base, newLayer)
-
-		if err != nil {
-			return "", fmt.Errorf("appending %v: %w", newLayer, err)
-		}
+	yoloLayers, err := GetSourceLayers(base, false, true)
+	if err != nil {
+		return "", fmt.Errorf("getting source layers: %w", err)
 	}
-	fmt.Fprintln(os.Stderr, "appending took", time.Since(start))
+
+	newLayer, err := MakeTar(files, yoloLayers)
+	if err != nil {
+		return "", fmt.Errorf("making tar: %w", err)
+	}
+
+	img, err = appendLayer(yoloLess, newLayer)
+	if err != nil {
+		return "", fmt.Errorf("appending %v: %w", newLayer, err)
+	}
 
 	// --- pushing image
-	start = time.Now()
-
-	err = crane.Push(img, dest, crane.WithAuth(auth))
+	start := time.Now()
+	err = crane.Push(img, dest, crane.WithAuth(session))
 	if err != nil {
 		return "", fmt.Errorf("pushing %s: %w", dest, err)
 	}
-
 	fmt.Fprintln(os.Stderr, "pushing took", time.Since(start))
 
-	d, err := img.Digest()
-	if err != nil {
-		return "", err
-	}
-	image_id := fmt.Sprintf("%s@%s", dest, d)
-	return image_id, nil
+	return ImageId(dest, img)
 }
 
 // All of this code is from pkg/v1/mutate - so we can add history and use a tarball
@@ -148,16 +127,47 @@ func updatePredictor(img v1.Image, predictorToParse string) (v1.Image, error) {
 	return mutate.Config(img, cfg.Config)
 }
 
-func getSchema(predictorToParse string) (string, error) {
-	cmd := exec.Command("python3", "-c", script, predictorToParse)
-
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err := cmd.Run()
+// we need to remove any existing yolo layers before adding more... otherwise
+// we'll end up with a bunch of yolo layers
+func removeYolo(orig v1.Image) (v1.Image, error) {
+	layers, err := orig.Layers()
 	if err != nil {
-		return "", fmt.Errorf("running ast_openapi_schema.py: %w", err)
+		return nil, fmt.Errorf("failed to get layers for original: %w", err)
 	}
 
-	schema := string(bytes.TrimSpace(out.Bytes()))
-	return schema, nil
+	config, err := orig.ConfigFile()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get config for original: %w", err)
+	}
+
+	yololessImage, err := mutate.Config(empty.Image, *config.Config.DeepCopy())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create empty image with original config: %w", err)
+	}
+
+	idx := 0
+	for _, h := range config.History {
+
+		if h.CreatedBy != "cp . /src # yolo" {
+			add := mutate.Addendum{
+				Layer:   nil,
+				History: h,
+			}
+			if !h.EmptyLayer {
+				add.Layer = layers[idx]
+			}
+
+			fmt.Println("adding layer", add.Layer, "with history", h)
+			yololessImage, err = mutate.Append(yololessImage, add)
+			if err != nil {
+				return nil, fmt.Errorf("failed to add layer: %w", err)
+			}
+		}
+
+		if !h.EmptyLayer {
+			idx++
+		}
+	}
+
+	return yololessImage, nil
 }

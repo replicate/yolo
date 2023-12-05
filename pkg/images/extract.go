@@ -14,7 +14,7 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
-func Extract(baseRef string, dest string, auth authn.Authenticator) error {
+func Extract(baseRef string, dest string, session authn.Authenticator) error {
 	var err error
 
 	if _, err = os.Stat(dest); !os.IsNotExist(err) {
@@ -25,29 +25,30 @@ func Extract(baseRef string, dest string, auth authn.Authenticator) error {
 
 	fmt.Fprintln(os.Stderr, "fetching metadata for", baseRef)
 
-	base, err = crane.Pull(baseRef, crane.WithAuth(auth))
+	base, err = crane.Pull(baseRef, crane.WithAuth(session))
 	if err != nil {
 		return fmt.Errorf("pulling %w", err)
 	}
 
-	layers, err := base.Layers()
-	if err != nil {
-		return fmt.Errorf("getting layers %w", err)
-	}
-
-	// FIXME(ja): don't assume the most recent layer is right!
-	// example: if this was yolo'd we should extract the src layer and then
-	// the yolo layer
-
-	layer := layers[len(layers)-1]
-
-	rc, err := layer.Uncompressed()
+	src, err := GetSourceLayers(base, true, true)
 	if err != nil {
 		return err
 	}
 
-	tr := tar.NewReader(rc)
-	return extractTarFile(tr, dest)
+	for _, layer := range src {
+		rc, err := layer.Uncompressed()
+		if err != nil {
+			return err
+		}
+
+		tr := tar.NewReader(rc)
+		err = extractTarFile(tr, dest)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func extractTarFile(tarReader *tar.Reader, destDir string) error {
@@ -94,6 +95,7 @@ func extractTarFile(tarReader *tar.Reader, destDir string) error {
 			return fmt.Errorf("unsupported file type for %s, typeflag %s", header.Name, string(header.Typeflag))
 		}
 	}
+
 	elapsed := time.Since(startTime).Seconds()
 	size := humanize.Bytes(uint64(_fileSize))
 	throughput := humanize.Bytes(uint64(float64(_fileSize) / elapsed))

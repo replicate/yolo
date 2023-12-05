@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/logs"
@@ -42,7 +41,7 @@ func authenticate() authn.Authenticator {
 	}
 
 	if sToken != "" {
-		u, err := auth.VerifyCogToken(sRegistry, sToken)
+		u, err := auth.VerifyCogToken(sToken)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "authentication error, invalid token or registry host error")
 			return nil
@@ -51,11 +50,4 @@ func authenticate() authn.Authenticator {
 	}
 
 	return authn.Anonymous
-}
-
-func ensureRegistry(baseRef string) string {
-	if !strings.Contains(baseRef, sRegistry) {
-		return sRegistry + "/" + baseRef
-	}
-	return baseRef
 }

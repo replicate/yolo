@@ -5,22 +5,18 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 )
 
-func addressWithScheme(address string) string {
-	if strings.Contains(address, "://") {
-		return address
-	}
-	return "https://" + address
+type responseBody struct {
+	Username string `json:"username"`
 }
 
-func VerifyCogToken(registryHost string, token string) (username string, err error) {
+func VerifyCogToken(token string) (username string, err error) {
 	if token == "" {
 		return "", fmt.Errorf("token is required")
 	}
 
-	resp, err := http.PostForm(addressWithScheme(registryHost)+"/cog/v1/verify-token", url.Values{
+	resp, err := http.PostForm("https://r8.im/cog/v1/verify-token", url.Values{
 		"token": []string{token},
 	})
 	if err != nil {
@@ -33,11 +29,11 @@ func VerifyCogToken(registryHost string, token string) (username string, err err
 		return "", fmt.Errorf("failed to verify token, got status %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
-	body := &struct {
-		Username string `json:"username"`
-	}{}
+
+	body := &responseBody{}
 	if err := json.NewDecoder(resp.Body).Decode(body); err != nil {
 		return "", err
 	}
+
 	return body.Username, nil
 }

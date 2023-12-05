@@ -2,9 +2,7 @@ package cli
 
 import (
 	"archive/tar"
-	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -14,14 +12,13 @@ import (
 )
 
 var (
-	sToken    string
-	sRegistry string
-	sBaseApi  string
-	baseRef   string
-	dest      string
-	ast       string
-	commit    string
-	sampleDir string
+	sToken        string
+	sBaseApi      string
+	baseRef       string
+	dest          string
+	ast           string
+	commit        string
+	sampleDir     string
 	relativePaths bool
 )
 
@@ -35,7 +32,6 @@ func newPushCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&sToken, "token", "t", "", "replicate api token")
-	cmd.Flags().StringVarP(&sRegistry, "registry", "r", "r8.im", "registry host")
 	cmd.Flags().BoolVarP(&relativePaths, "relative-paths", "p", false, "preserve relative paths from where yolo is run instead of placing all files under /src")
 	cmd.Flags().StringVarP(&baseRef, "base", "b", "", "base image reference.  examples: owner/model or r8.im/owner/model@sha256:hexdigest")
 	cmd.MarkFlagRequired("base")
@@ -56,15 +52,36 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	tar, err := makeTar(args)
-	if err != nil {
-		return err
+	baseRef = images.EnsureRegistry(baseRef)
+	dest = images.EnsureRegistry(dest)
+
+	var files []images.LayerFile
+	for _, path := range args {
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		var dest string
+		if relativePaths {
+			dest = filepath.Join("src", path)
+		} else {
+			baseName := filepath.Base(path)
+			dest = filepath.Join("src", baseName)
+		}
+		file := images.LayerFile{
+			Header: &tar.Header{
+				Name: dest,
+				Mode: 0644,
+				Size: int64(len(body)),
+			},
+			Body: body,
+		}
+
+		files = append(files, file)
 	}
 
-	baseRef = ensureRegistry(baseRef)
-	dest = ensureRegistry(dest)
-
-	image_id, err := images.Affix(baseRef, dest, tar, ast, commit, session)
+	image_id, err := images.Yolo(baseRef, dest, files, ast, commit, session)
 	if err != nil {
 		return err
 	}
@@ -80,48 +97,4 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-func makeTar(args []string) (*bytes.Buffer, error) {
-	buf := new(bytes.Buffer)
-	tw := tar.NewWriter(buf)
-
-	for _, file := range args {
-		f, err := os.Open(file)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-
-		stat, err := f.Stat()
-		if err != nil {
-			return nil, err
-		}
-		var dest string
-		if relativePaths {
-			dest = filepath.Join("src", file)
-		} else {
-			baseName := filepath.Base(file)
-			dest = filepath.Join("src", baseName)
-		}
-		fmt.Fprintln(os.Stderr, "adding:", dest)
-
-		hdr := &tar.Header{
-			Name: dest,
-			Mode: int64(stat.Mode()),
-			Size: stat.Size(),
-		}
-		if err := tw.WriteHeader(hdr); err != nil {
-			return nil, err
-		}
-		if _, err := io.Copy(tw, f); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := tw.Close(); err != nil {
-		return nil, err
-	}
-
-	return buf, nil
 }
