@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -17,51 +18,67 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
-func Yolo(baseRef string, dest string, files []LayerFile, predictorToParse string, commit string, session authn.Authenticator) (string, error) {
+func Yolo(baseRef string, dest string, files []LayerFile, predictorToParse string, commit string, env []string, session authn.Authenticator) (string, error) {
 	fmt.Fprintln(os.Stderr, "fetching metadata for", baseRef)
 	base, err := crane.Pull(baseRef, crane.WithAuth(session))
 	if err != nil {
 		return "", fmt.Errorf("pulling %w", err)
 	}
 
-	yoloLess, err := removeYolo(base)
-	if err != nil {
-		return "", fmt.Errorf("removing existing yolo layers: %w", err)
-	}
-
-	// try to parse the predictor if it's provided
-	if predictorToParse != "" {
-		yoloLess, err = updatePredictor(yoloLess, predictorToParse)
-		if err != nil {
-			return "", fmt.Errorf("updating predictor: %w", err)
-		}
-	}
-
-	if commit != "" {
-		yoloLess, err = updateCommit(yoloLess, commit)
-		if err != nil {
-			return "", fmt.Errorf("updating commit: %w", err)
-		}
-	}
-
-	fmt.Fprintln(os.Stderr, "appending as new layer")
 	var img v1.Image
 
-	yoloLayers, err := GetSourceLayers(base, false, true)
-	if err != nil {
-		return "", fmt.Errorf("getting source layers: %w", err)
-	}
+	if len(files) > 0 {
+		yoloLess, err := removeYolo(base)
+		if err != nil {
+			return "", fmt.Errorf("removing existing yolo layers: %w", err)
+		}
 
-	newLayer, err := MakeTar(files, yoloLayers)
-	if err != nil {
-		return "", fmt.Errorf("making tar: %w", err)
-	}
+		// try to parse the predictor if it's provided
+		if predictorToParse != "" {
+			yoloLess, err = updatePredictor(yoloLess, predictorToParse)
+			if err != nil {
+				return "", fmt.Errorf("updating predictor: %w", err)
+			}
+		}
 
-	img, err = appendLayer(yoloLess, newLayer)
-	if err != nil {
-		return "", fmt.Errorf("appending %v: %w", newLayer, err)
-	}
+		if len(env) > 0 {
+			yoloLess, err = updateEnv(yoloLess, env)
+			if err != nil {
+				return "", fmt.Errorf("updating env: %w", err)
+			}
+		}
 
+		if commit != "" {
+			yoloLess, err = updateCommit(yoloLess, commit)
+			if err != nil {
+				return "", fmt.Errorf("updating commit: %w", err)
+			}
+		}
+
+		fmt.Fprintln(os.Stderr, "appending as new layer")
+
+		yoloLayers, err := GetSourceLayers(base, false, true)
+		if err != nil {
+			return "", fmt.Errorf("getting source layers: %w", err)
+		}
+
+		newLayer, err := MakeTar(files, yoloLayers)
+		if err != nil {
+			return "", fmt.Errorf("making tar: %w", err)
+		}
+
+		img, err = appendLayer(yoloLess, newLayer)
+		if err != nil {
+			return "", fmt.Errorf("appending %v: %w", newLayer, err)
+		}
+	} else {
+		if len(env) > 0 {
+			img, err = updateEnv(base, env)
+			if err != nil {
+				return "", fmt.Errorf("updating env: %w", err)
+			}
+		}
+	}
 	// --- pushing image
 	start := time.Now()
 	err = crane.Push(img, dest, crane.WithAuth(session))
@@ -106,6 +123,30 @@ func updateCommit(img v1.Image, commit string) (v1.Image, error) {
 	cfg.Config.Labels["org.opencontainers.image.revision"] = commit
 
 	return mutate.Config(img, cfg.Config)
+}
+
+func updateEnv(base v1.Image, env []string) (v1.Image, error) {
+	cfg, err := base.ConfigFile()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, e := range env {
+		fmt.Fprintf(os.Stderr, "updating env: %s\n", e)
+		key := e[:strings.Index(e, "=")]
+		found := false
+		for i, v := range cfg.Config.Env {
+			if strings.HasPrefix(v, key+"=") {
+				cfg.Config.Env[i] = e
+				found = true
+			}
+		}
+		if !found {
+			cfg.Config.Env = append(cfg.Config.Env, e)
+		}
+	}
+
+	return mutate.Config(base, cfg.Config)
 }
 
 func updatePredictor(img v1.Image, predictorToParse string) (v1.Image, error) {

@@ -20,6 +20,7 @@ var (
 	commit        string
 	sampleDir     string
 	relativePaths bool
+	env           []string
 )
 
 func newPushCommand() *cobra.Command {
@@ -28,7 +29,7 @@ func newPushCommand() *cobra.Command {
 		Short:  "update an existing image",
 		Hidden: false,
 		RunE:   pushCommmand,
-		Args:   cobra.MinimumNArgs(1),
+		Args:   cobra.MinimumNArgs(0),
 	}
 
 	cmd.Flags().StringVarP(&sToken, "token", "t", "", "replicate api token")
@@ -41,7 +42,7 @@ func newPushCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&commit, "commit", "c", "", "optional commit hash to update git commit")
 	cmd.Flags().StringVarP(&sampleDir, "sample-dir", "s", "", "optional directory to run samples")
 	cmd.Flags().StringVarP(&sBaseApi, "test-api", "u", "http://localhost:4000", "experiment endpoint")
-
+	cmd.Flags().StringArrayVarP(&env, "env", "e", []string{}, "environment variables to add to the image")
 	return cmd
 }
 
@@ -81,7 +82,7 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 		files = append(files, file)
 	}
 
-	image_id, err := images.Yolo(baseRef, dest, files, ast, commit, session)
+	image_id, err := images.Yolo(baseRef, dest, files, ast, commit, env, session)
 	if err != nil {
 		return err
 	}
