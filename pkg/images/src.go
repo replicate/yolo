@@ -1,6 +1,10 @@
 package images
 
-import v1 "github.com/google/go-containerregistry/pkg/v1"
+import (
+	"regexp"
+
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+)
 
 // returns /src layers created by yolo and/or cog, oldest layers first
 func GetSourceLayers(base v1.Image, cog bool, yolo bool) ([]v1.Layer, error) {
@@ -16,6 +20,7 @@ func GetSourceLayers(base v1.Image, cog bool, yolo bool) ([]v1.Layer, error) {
 		return nil, err
 	}
 
+	re := regexp.MustCompile(` COPY .*\/src ?(# .*)?$`)
 	idx := 0
 	for _, h := range cfg.History {
 		if h.EmptyLayer {
@@ -25,7 +30,7 @@ func GetSourceLayers(base v1.Image, cog bool, yolo bool) ([]v1.Layer, error) {
 		if yolo && h.CreatedBy == "cp . /src # yolo" {
 			srcLayers = append(srcLayers, layers[idx])
 		}
-		if cog && h.CreatedBy == "COPY . /src # buildkit" {
+		if cog && (h.CreatedBy == "COPY . /src # buildkit" || re.MatchString(h.CreatedBy)) {
 			srcLayers = append(srcLayers, layers[idx])
 		}
 		idx++
