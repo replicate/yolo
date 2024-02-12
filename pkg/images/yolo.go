@@ -149,7 +149,7 @@ func updateEnv(base v1.Image, env []string) (v1.Image, error) {
 	return mutate.Config(base, cfg.Config)
 }
 
-func updatePredictor(img v1.Image, scheam string) (v1.Image, error) {
+func updatePredictor(img v1.Image, schema string) (v1.Image, error) {
 	cfg, err := img.ConfigFile()
 	if err != nil {
 		return nil, err
