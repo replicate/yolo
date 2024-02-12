@@ -10,7 +10,7 @@ import (
 //go:embed ast_openapi_schema.py
 var ast_openapi_schema string
 
-func getSchema(predictorToParse string) (string, error) {
+func GetSchema(predictorToParse string) (string, error) {
 	cmd := exec.Command("python3", "-c", ast_openapi_schema, predictorToParse)
 
 	var out bytes.Buffer

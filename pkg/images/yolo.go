@@ -18,7 +18,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
-func Yolo(baseRef string, dest string, files []LayerFile, predictorToParse string, commit string, env []string, session authn.Authenticator) (string, error) {
+func Yolo(baseRef string, dest string, files []LayerFile, schema string, commit string, env []string, session authn.Authenticator) (string, error) {
 	fmt.Fprintln(os.Stderr, "fetching metadata for", baseRef)
 	base, err := crane.Pull(baseRef, crane.WithAuth(session))
 	if err != nil {
@@ -34,8 +34,8 @@ func Yolo(baseRef string, dest string, files []LayerFile, predictorToParse strin
 		}
 
 		// try to parse the predictor if it's provided
-		if predictorToParse != "" {
-			yoloLess, err = updatePredictor(yoloLess, predictorToParse)
+		if schema != "" {
+			yoloLess, err = updatePredictor(yoloLess, schema)
 			if err != nil {
 				return "", fmt.Errorf("updating predictor: %w", err)
 			}
@@ -149,12 +149,7 @@ func updateEnv(base v1.Image, env []string) (v1.Image, error) {
 	return mutate.Config(base, cfg.Config)
 }
 
-func updatePredictor(img v1.Image, predictorToParse string) (v1.Image, error) {
-	schema, err := getSchema(predictorToParse)
-	if err != nil {
-		return nil, fmt.Errorf("getting schema: %w", err)
-	}
-
+func updatePredictor(img v1.Image, scheam string) (v1.Image, error) {
 	cfg, err := img.ConfigFile()
 	if err != nil {
 		return nil, err
