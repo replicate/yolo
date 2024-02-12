@@ -40,7 +40,7 @@ func newPushCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&dest, "dest", "d", "", "destination image. examples: owner/model or r8.im/owner/model")
 	cmd.MarkFlagRequired("dest")
 	cmd.Flags().StringVarP(&ast, "ast", "a", "", "optional file to parse AST to update openapi schema")
-	cmd.Flags().StringVarP(&openapi, "openapi", "o", "", "optional file with openapi schema")
+	cmd.Flags().StringVarP(&openapi, "openapi", "o", "", "optional json file with openapi schema")
 	cmd.Flags().StringVarP(&commit, "commit", "c", "", "optional commit hash to update git commit")
 	cmd.Flags().StringVarP(&sampleDir, "sample-dir", "s", "", "optional directory to run samples")
 	cmd.Flags().StringVarP(&sBaseApi, "test-api", "u", "http://localhost:4000", "experiment endpoint")
