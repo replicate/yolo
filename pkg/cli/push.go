@@ -18,6 +18,7 @@ var (
 	dest          string
 	ast           string
 	commit        string
+	openapi       string
 	sampleDir     string
 	relativePaths bool
 	env           []string
@@ -39,6 +40,7 @@ func newPushCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&dest, "dest", "d", "", "destination image. examples: owner/model or r8.im/owner/model")
 	cmd.MarkFlagRequired("dest")
 	cmd.Flags().StringVarP(&ast, "ast", "a", "", "optional file to parse AST to update openapi schema")
+	cmd.Flags().StringVarP(&openapi, "openapi", "o", "", "optional json file with openapi schema")
 	cmd.Flags().StringVarP(&commit, "commit", "c", "", "optional commit hash to update git commit")
 	cmd.Flags().StringVarP(&sampleDir, "sample-dir", "s", "", "optional directory to run samples")
 	cmd.Flags().StringVarP(&sBaseApi, "test-api", "u", "http://localhost:4000", "experiment endpoint")
@@ -82,7 +84,25 @@ func pushCommmand(cmd *cobra.Command, args []string) error {
 		files = append(files, file)
 	}
 
-	image_id, err := images.Yolo(baseRef, dest, files, ast, commit, env, session)
+	var schema string
+	var err error
+
+	if openapi != "" {
+		schemaBytes, err := os.ReadFile(openapi)
+		if err != nil {
+			return fmt.Errorf("reading openapi file: %w", err)
+		}
+		schema = string(schemaBytes)
+	}
+
+	if ast != "" {
+		schema, err = images.GetSchema(ast)
+		if err != nil {
+			return fmt.Errorf("parsing schema: %w", err)
+		}
+	}
+
+	image_id, err := images.Yolo(baseRef, dest, files, schema, commit, env, session)
 	if err != nil {
 		return err
 	}
